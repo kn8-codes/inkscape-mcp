@@ -177,10 +177,21 @@ def _parse_shape_clause(clause: str, width: int, height: int, palette: dict, ind
             break
 
     pos_x, pos_y = 0.5, 0.5
-    for kw, (px, py) in POSITION_KEYWORDS.items():
-        if kw in clause.lower():
-            pos_x, pos_y = px, py
-            break
+    cl = clause.lower()
+    # Pass 1: direct token match — catches "top-left" as a single hyphenated word
+    matched = next((POSITION_KEYWORDS[w] for w in words if w in POSITION_KEYWORDS), None)
+    # Pass 2: bigrams — catches "top left" as two adjacent words
+    if matched is None:
+        bigrams = [f"{words[i]}-{words[i + 1]}" for i in range(len(words) - 1)]
+        matched = next((POSITION_KEYWORDS[b] for b in bigrams if b in POSITION_KEYWORDS), None)
+    # Pass 3: longest-first substring — catches embedded positions in longer phrases
+    if matched is None:
+        for kw in sorted(POSITION_KEYWORDS, key=len, reverse=True):
+            if kw in cl:
+                matched = POSITION_KEYWORDS[kw]
+                break
+    if matched:
+        pos_x, pos_y = matched
 
     stroke = "none"
     stroke_width = "0"
@@ -312,7 +323,6 @@ def _make_svg(width: int, height: int) -> etree._Element:
     svg.set("viewBox", f"0 0 {width} {height}")
     svg.set("width", str(width))
     svg.set("height", str(height))
-    svg.set("xmlns", SVG_NS)
     return svg
 
 
