@@ -125,18 +125,19 @@ SIZE_TO_PX = {
 }
 
 POSITION_KEYWORDS = {
-    "center":       (0.5,  0.5),
-    "middle":       (0.5,  0.5),
-    "top":          (0.5,  0.1),
-    "bottom":       (0.5,  0.9),
-    "left":         (0.1,  0.5),
-    "right":        (0.9,  0.5),
-    "top-left":     (0.1,  0.1),
-    "top-right":    (0.9,  0.1),
-    "bottom-left":  (0.1,  0.9),
-    "bottom-right": (0.9,  0.9),
-    "upper":        (0.5,  0.2),
-    "lower":        (0.5,  0.8),
+    "center":        (0.5,  0.5),
+    "middle":        (0.5,  0.5),
+    "top":           (0.5,  0.1),
+    "bottom":        (0.5,  0.9),
+    "left":          (0.1,  0.5),
+    "right":         (0.9,  0.5),
+    "top-left":      (0.1,  0.1),
+    "top-right":     (0.9,  0.1),
+    "bottom-left":   (0.1,  0.9),
+    "bottom-right":  (0.9,  0.9),
+    "upper-center":  (0.5,  0.28),
+    "upper":         (0.5,  0.25),
+    "lower":         (0.5,  0.75),
 }
 
 
@@ -234,13 +235,19 @@ def _parse_shape_clause(clause: str, width: int, height: int, palette: dict, ind
         attrs.update({"cx": str(cx), "cy": str(cy), "rx": str(rx), "ry": str(ry)})
 
     elif shape_type == "rect":
+        is_bg = any(kw in word_set for kw in ["background", "bg"])
         w = int(width * size_frac)
         h = int(height * size_frac)
-        if any(kw in word_set for kw in ["bar", "strip", "banner", "full", "wide"]):
+        if is_bg:
+            x, y, w, h = 0, 0, width, height
+        elif any(kw in word_set for kw in ["bar", "strip", "banner", "full", "wide"]):
             w = width
             h = max(int(height * 0.08), 20)
-        x = int(width * pos_x - w / 2)
-        y = int(height * pos_y - h / 2)
+            x = 0
+            y = int(height * pos_y - h / 2)
+        else:
+            x = int(width * pos_x - w / 2)
+            y = int(height * pos_y - h / 2)
         rx = "0"
         if any(kw in word_set for kw in ["rounded", "soft", "card", "panel"]):
             rx = str(max(4, int(min(w, h) * 0.08)))
@@ -355,6 +362,35 @@ def parse_brief(brief: str, width: int, height: int) -> tuple[list[dict], dict]:
             },
             "group": "layer-1",
         })
+
+    def _z_key(desc: dict) -> int:
+        words = set(desc.get("attrs", {}).get("id", "").lower().split("-"))
+        clause_words = set()
+        # pull from original clause via id index — use shape+id as heuristic
+        if desc["shape"] == "text":
+            return 2
+        # background rects to bottom
+        if desc["shape"] == "rect":
+            # check if any bg markers ended up in attrs (fill is dark/surface) —
+            # simpler: re-check original clause words stored on desc if present
+            if desc.get("is_bg"):
+                return 0
+        return 1
+
+    # tag bg rects during parse so _z_key can see them
+    for desc in descriptors:
+        if desc["shape"] == "rect" and desc["attrs"].get("x") == "0" and desc["attrs"].get("y") == "0" \
+                and desc["attrs"].get("width") == str(width) and desc["attrs"].get("height") == str(height):
+            desc["is_bg"] = True
+
+    descriptors.sort(key=_z_key)
+
+    # re-number IDs to match new order
+    counters: dict[str, int] = {}
+    for desc in descriptors:
+        shape = desc["shape"]
+        counters[shape] = counters.get(shape, 0) + 1
+        desc["id"] = f"{shape}-{counters[shape]}"
 
     return descriptors, palette
 
