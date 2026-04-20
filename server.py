@@ -18,6 +18,7 @@ from tools.generate import generate_svg
 from tools.transform import transform_element
 from tools.export import export_png, export_svg_clean
 from tools.batch import batch_export_folder
+from tools.gsap import generate_gsap
 
 app = Server("inkscape-mcp")
 
@@ -123,6 +124,18 @@ async def list_tools() -> list[Tool]:
                 },
                 "required": ["input_folder", "output_folder"]
             }
+        ),
+        Tool(
+            name="generate_gsap",
+            description="Read element IDs from an SVG and generate a matching GSAP animation JS file with per-type defaults and staggered timing.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "svg_path": {"type": "string", "description": "Path to the source SVG file"},
+                    "output_path": {"type": "string", "description": "Where to write the JS file (defaults to svg_path with .js extension)"}
+                },
+                "required": ["svg_path"]
+            }
         )
     ]
 
@@ -146,6 +159,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = boolean_op(**arguments)
         elif name == "batch_export_folder":
             result = batch_export_folder(**arguments)
+        elif name == "generate_gsap":
+            result = generate_gsap(**arguments)
         else:
             result = {"error": f"Unknown tool: {name}"}
 
