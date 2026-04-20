@@ -72,6 +72,12 @@ SHAPE_KEYWORDS = {
     "curve":      "path",
     "wave":       "path",
     "arc":        "path",
+    "text":       "text",
+    "label":      "text",
+    "heading":    "text",
+    "title":      "text",
+    "caption":    "text",
+    "copy":       "text",
 }
 
 COLOR_KEYWORDS = {
@@ -107,6 +113,15 @@ SIZE_KEYWORDS = {
     "full":   1.0,
     "wide":   None,
     "tall":   None,
+}
+
+SIZE_TO_PX = {
+    "tiny":   10,
+    "small":  14,
+    "medium": 20,
+    "large":  28,
+    "huge":   40,
+    "big":    36,
 }
 
 POSITION_KEYWORDS = {
@@ -261,6 +276,33 @@ def _parse_shape_clause(clause: str, width: int, height: int, palette: dict, ind
             points = f"{cx},{cy - s} {cx + s},{cy + s} {cx - s},{cy + s}"
         attrs.update({"points": points})
 
+    elif shape_type == "text":
+        quoted = re.search(r'"([^"]+)"', clause)
+        content = quoted.group(1) if quoted else "text"
+        font_size = next((SIZE_TO_PX[kw] for kw in SIZE_TO_PX if kw in word_set), 16)
+        is_heading = "heading" in word_set or "title" in word_set
+        font_family = "Georgia, 'Times New Roman', serif" if is_heading else "Inter, Arial, sans-serif"
+        font_weight = "700" if is_heading else "400"
+        x = int(width * pos_x)
+        y = int(height * pos_y)
+        attrs = {
+            "x": str(x),
+            "y": str(y),
+            "font-size": str(font_size),
+            "font-family": font_family,
+            "font-weight": font_weight,
+            "fill": fill,
+            "text-anchor": "middle",
+            "dominant-baseline": "middle",
+        }
+        return {
+            "shape": "text",
+            "id": shape_id,
+            "attrs": attrs,
+            "content": content,
+            "group": "layer-1",
+        }
+
     elif shape_type == "path":
         cx = int(width * pos_x)
         cy = int(height * pos_y)
@@ -333,6 +375,8 @@ def _add_descriptor(parent: etree._Element, desc: dict) -> etree._Element:
     el.set("id", desc["id"])
     for k, v in desc["attrs"].items():
         el.set(k, str(v))
+    if shape == "text":
+        el.text = desc.get("content", "text")
     return el
 
 
